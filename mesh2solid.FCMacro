@@ -1,0 +1,105 @@
+# -*- coding: utf-8 -*-
+# (c) MaxiV, 2023
+
+__Name__ = 'Mesh2Solid_FreeCAD'
+__Comment__ = 'A macro to convert a mesh to a solid in FreeCAD'
+__Author__ = 'Maxi Vasquez'
+__Version__ = '0.1'
+__Date__ = '2023-08-13'
+__License__ = 'LGPL-2.0-or-later'
+
+import FreeCAD as App
+import FreeCADGui as Gui
+import Part
+import MeshPart
+from PySide2 import QtGui, QtCore, QtWidgets
+
+class ProgressDialog(QtWidgets.QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Progress Dialog")
+        self.layout = QtWidgets.QVBoxLayout(self)
+        self.label = QtWidgets.QLabel("Converting to Solid...")
+        self.progress_bar = QtWidgets.QProgressBar()
+        self.progress_bar.setRange(0, 100)
+        self.layout.addWidget(self.label)
+        self.layout.addWidget(self.progress_bar)
+
+    def update_progress(self, value):
+        self.progress_bar.setValue(value)
+        QtWidgets.QApplication.processEvents()
+
+    def set_completed_text(self):
+        self.label.setText("Solid created.")
+
+def create_solid_from_mesh(mesh_object, dialog):
+    if mesh_object.TypeId == "Mesh::Feature":
+        # Create shape from mesh
+        shape = Part.Shape()
+        shape.makeShapeFromMesh(mesh_object.Mesh.Topology, 0.1)
+
+        # Update progress to 0% and show dialog
+        dialog.update_progress(0)
+        QtCore.QCoreApplication.processEvents()
+        dialog.show()
+
+        # Start the process after a 2000ms delay
+        QtCore.QTimer.singleShot(2000, lambda: start_process(mesh_object, shape, dialog))
+    else:
+        print("Error: No valid mesh selected.")
+
+def start_process(selected_object, shape, dialog):
+    # Update progress to indicate refinement start
+    dialog.update_progress(33)
+
+    # Create a shell from the mesh
+    solid = App.ActiveDocument.addObject("Part::Feature", "Shell")
+    solid.Shape = shape
+    solid.Placement = selected_object.Placement
+    solid.purgeTouched()
+    App.ActiveDocument.recompute()
+
+    # Execute refine command
+    refine_command = f"""
+App.ActiveDocument.addObject('Part::Refine', 'RefinedShell').Source = App.ActiveDocument.{solid.Name}
+Gui.ActiveDocument.{solid.Name}.hide()
+App.ActiveDocument.recompute()
+"""
+    exec(refine_command)
+
+    # Update progress to indicate solid creation
+    dialog.update_progress(66)
+
+    # Create solid from refined shell
+    solid_object = App.activeDocument().addObject("Part::Feature", "Solid")
+    solid_object.Shape = Part.Solid(App.ActiveDocument.RefinedShell.Shape)
+    solid_object.Placement = solid.Placement
+    solid_object.purgeTouched()
+    solid_object.Label = f"{selected_object.Label} (Solid)"
+    App.ActiveDocument.recompute()
+
+    # Hide original mesh and cleanup intermediate objects
+    selected_object.Visibility = False
+    App.ActiveDocument.removeObject(solid.Name)
+    App.ActiveDocument.removeObject("RefinedShell")
+
+    print("Solid successfully created.")
+
+    # Update progress to indicate completion
+    dialog.update_progress(100)
+    dialog.set_completed_text()
+
+    # Close the dialog after a 2000ms delay
+    QtCore.QTimer.singleShot(2000, dialog.close)
+
+# Get the currently selected mesh object in FreeCAD
+selection = Gui.Selection.getSelection()
+if len(selection) > 0:
+    selected_object = selection[0]
+    # Create progress dialog
+    progress_dialog = ProgressDialog()
+
+    # Call the function to create the refined shell and convert it to a solid
+    create_solid_from_mesh(selected_object, progress_dialog)
+else:
+    print("Error: No valid mesh selected.")
