@@ -4,15 +4,27 @@
 __Name__ = 'Mesh2Solid_FreeCAD'
 __Comment__ = 'A macro to convert a mesh to a solid in FreeCAD'
 __Author__ = 'Maxi Vasquez'
-__Version__ = '0.1'
-__Date__ = '2023-08-13'
+__Version__ = '0.2'
+__Date__ = '2023-08-18'
 __License__ = 'LGPL-2.0-or-later'
 
 import FreeCAD as App
 import FreeCADGui as Gui
 import Part
 import MeshPart
+import time
 from PySide2 import QtGui, QtCore, QtWidgets
+
+class CheckComponentsDialog(QtWidgets.QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Check Components Dialog")
+        self.layout = QtWidgets.QVBoxLayout(self)
+        self.label = QtWidgets.QLabel("The mesh has multiple components.\nYou should use the Split tool on the Mesh workbench to explode and convert the desired component to solid.")
+        self.ok_button = QtWidgets.QPushButton("OK")
+        self.layout.addWidget(self.label)
+        self.layout.addWidget(self.ok_button)
+        self.ok_button.clicked.connect(self.close)
 
 class ProgressDialog(QtWidgets.QDialog):
     def __init__(self, parent=None):
@@ -32,40 +44,53 @@ class ProgressDialog(QtWidgets.QDialog):
     def set_completed_text(self):
         self.label.setText("Solid created.")
 
-def create_solid_from_mesh(mesh_object, dialog):
+def create_solid_from_mesh(mesh_object, check_dialog, process_dialog):
     if mesh_object.TypeId == "Mesh::Feature":
-        # Create shape from mesh
-        shape = Part.Shape()
-        shape.makeShapeFromMesh(mesh_object.Mesh.Topology, 0.1)
+        num_components = len(mesh_object.Mesh.getSeparateComponents())
+        if num_components > 1:
+            check_dialog.show()
+        else:
+            print("Starting the conversion to solid...")  # Print the message
+            start_time = time.time()  # Record start time
 
-        # Update progress to 0% and show dialog
-        dialog.update_progress(0)
-        QtCore.QCoreApplication.processEvents()
-        dialog.show()
+            # Create shape from mesh
+            shape = Part.Shape()
+            shape.makeShapeFromMesh(mesh_object.Mesh.Topology, 0.1)
 
-        # Start the process after a 2000ms delay
-        QtCore.QTimer.singleShot(2000, lambda: start_process(mesh_object, shape, dialog))
+            # Update progress to 0% and show dialog
+            process_dialog.update_progress(0)
+            QtCore.QCoreApplication.processEvents()
+            process_dialog.show()
+
+            # Start the process after a 2000ms delay
+            QtCore.QTimer.singleShot(2000, lambda: start_process(mesh_object, shape, process_dialog, start_time))
     else:
         print("Error: No valid mesh selected.")
 
-def start_process(selected_object, shape, dialog):
+def start_process(selected_object, shape, dialog, start_time):
     # Update progress to indicate refinement start
     dialog.update_progress(33)
 
     # Create a shell from the mesh
+    shell_start_time = time.time()
     solid = App.ActiveDocument.addObject("Part::Feature", "Shell")
     solid.Shape = shape
     solid.Placement = selected_object.Placement
     solid.purgeTouched()
     App.ActiveDocument.recompute()
+    shell_end_time = time.time()
+
+    print(f"The shell was created in {int((shell_end_time - shell_start_time) * 1000)} milliseconds.")
 
     # Execute refine command
+    refine_start_time = time.time()
     refine_command = f"""
 App.ActiveDocument.addObject('Part::Refine', 'RefinedShell').Source = App.ActiveDocument.{solid.Name}
 Gui.ActiveDocument.{solid.Name}.hide()
 App.ActiveDocument.recompute()
 """
     exec(refine_command)
+    refine_end_time = time.time()
 
     # Update progress to indicate solid creation
     dialog.update_progress(66)
@@ -83,7 +108,11 @@ App.ActiveDocument.recompute()
     App.ActiveDocument.removeObject(solid.Name)
     App.ActiveDocument.removeObject("RefinedShell")
 
-    print("Solid successfully created.")
+    # Calculate and print times
+    refinement_time = int((refine_end_time - refine_start_time) * 1000)
+    total_time = int((time.time() - start_time) * 1000)
+    print(f"Refining was done in {refinement_time} milliseconds.")
+    print(f"The total time for the creation of the solid was {total_time} milliseconds.")
 
     # Update progress to indicate completion
     dialog.update_progress(100)
@@ -92,14 +121,12 @@ App.ActiveDocument.recompute()
     # Close the dialog after a 2000ms delay
     QtCore.QTimer.singleShot(2000, dialog.close)
 
-# Get the currently selected mesh object in FreeCAD
 selection = Gui.Selection.getSelection()
 if len(selection) > 0:
     selected_object = selection[0]
-    # Create progress dialog
-    progress_dialog = ProgressDialog()
-
-    # Call the function to create the refined shell and convert it to a solid
-    create_solid_from_mesh(selected_object, progress_dialog)
+    check_dialog = CheckComponentsDialog()
+    process_dialog = ProgressDialog()
+    create_solid_from_mesh(selected_object, check_dialog, process_dialog)
 else:
     print("Error: No valid mesh selected.")
+
