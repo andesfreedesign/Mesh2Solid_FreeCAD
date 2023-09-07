@@ -1,7 +1,8 @@
 # Mesh2Solid_FreeCAD
 A macro to convert a mesh to a solid in FreeCAD
 
-The macro internally executes 3 processes
+The macro internally executes 4 processes
+- Analyzes the number of mesh elements, if there are more than 1 it shows a message
 - Create the shell
 - Perform a refinement
 - Create a solid (shell and refining are removed)
