@@ -4,14 +4,13 @@
 __Name__ = 'Mesh2Solid_FreeCAD'
 __Comment__ = 'A macro to convert a mesh to a solid in FreeCAD'
 __Author__ = 'Maxi Vasquez'
-__Version__ = '0.2'
-__Date__ = '2023-08-18'
+__Version__ = '0.3'
+__Date__ = '2023-09-10'
 __License__ = 'LGPL-2.0-or-later'
 
 import FreeCAD as App
 import FreeCADGui as Gui
 import Part
-import MeshPart
 import time
 from PySide2 import QtGui, QtCore, QtWidgets
 
@@ -21,6 +20,17 @@ class CheckComponentsDialog(QtWidgets.QDialog):
         self.setWindowTitle("Check Components Dialog")
         self.layout = QtWidgets.QVBoxLayout(self)
         self.label = QtWidgets.QLabel("The mesh has multiple components.\nYou should use the Split tool on the Mesh workbench to explode and convert the desired component to solid.")
+        self.ok_button = QtWidgets.QPushButton("OK")
+        self.layout.addWidget(self.label)
+        self.layout.addWidget(self.ok_button)
+        self.ok_button.clicked.connect(self.close)
+
+class DecimationDialog(QtWidgets.QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Decimation Dialog")
+        self.layout = QtWidgets.QVBoxLayout(self)
+        self.label = QtWidgets.QLabel("The mesh has more than 100,000 faces.\nIt is advisable to use the Decimation tool of the Mesh Workbench to reduce the mesh, and then use this macro to convert to solid.")
         self.ok_button = QtWidgets.QPushButton("OK")
         self.layout.addWidget(self.label)
         self.layout.addWidget(self.ok_button)
@@ -46,9 +56,10 @@ class ProgressDialog(QtWidgets.QDialog):
 
 def create_solid_from_mesh(mesh_object, check_dialog, process_dialog):
     if mesh_object.TypeId == "Mesh::Feature":
-        num_components = len(mesh_object.Mesh.getSeparateComponents())
-        if num_components > 1:
-            check_dialog.show()
+        num_faces = len(mesh_object.Mesh.Facets)
+        if num_faces > 100000:
+            decimation_dialog = DecimationDialog()
+            decimation_dialog.exec_()  # Mostrar diálogo de decimación de manera modal
         else:
             print("Starting the conversion to solid...")  # Print the message
             start_time = time.time()  # Record start time
@@ -129,4 +140,5 @@ if len(selection) > 0:
     create_solid_from_mesh(selected_object, check_dialog, process_dialog)
 else:
     print("Error: No valid mesh selected.")
+
 
