@@ -5,14 +5,14 @@ __Name__ = 'Mesh2Solid_FreeCAD'
 __Comment__ = 'A macro to convert a mesh to a solid in FreeCAD'
 __Author__ = 'Maxi Vasquez'
 __Version__ = '0.3'
-__Date__ = '2023-09-10'
+__Date__ = '2025-03-30'
 __License__ = 'LGPL-2.0-or-later'
 
 import FreeCAD as App
 import FreeCADGui as Gui
 import Part
 import time
-from PySide2 import QtGui, QtCore, QtWidgets
+from PySide6 import QtGui, QtCore, QtWidgets
 
 class CheckComponentsDialog(QtWidgets.QDialog):
     def __init__(self, parent=None):
