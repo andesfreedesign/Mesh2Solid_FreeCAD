@@ -4,7 +4,7 @@
 __Name__ = 'Mesh2Solid_FreeCAD'
 __Comment__ = 'A macro to convert a mesh to a solid in FreeCAD'
 __Author__ = 'Maxi Vasquez'
-__Version__ = '0.3'
+__Version__ = '0.4'
 __Date__ = '2025-03-30'
 __License__ = 'LGPL-2.0-or-later'
 
