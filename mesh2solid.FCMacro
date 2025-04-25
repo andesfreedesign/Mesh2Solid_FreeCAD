@@ -12,7 +12,7 @@ import FreeCAD as App
 import FreeCADGui as Gui
 import Part
 import time
-from PySide6 import QtGui, QtCore, QtWidgets
+from PySide import QtGui, QtCore, QtWidgets
 
 class CheckComponentsDialog(QtWidgets.QDialog):
     def __init__(self, parent=None):
